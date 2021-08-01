@@ -19,9 +19,19 @@ class Forecast extends Component {
 
     getForecast() {
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(this.getClimaCellInfo);
+            navigator.geolocation.getCurrentPosition(this.getClimaCellInfo, this.handleGeoLocationError);
         } else { 
             alert("Geolocation is not supported by this browser.");
+        }
+    }
+
+    handleGeoLocationError(error) {
+        switch (error.code) {
+            case 1: 
+                alert("Location services have not been enabled in this browser. Please update your settings to enable location services.");
+                break;
+            default:
+                alert(error.message);
         }
     }
 
@@ -45,6 +55,7 @@ class Forecast extends Component {
                 this.setState({
                     forecastData: result
                 });
+                console.log(result);
         })
         .catch(err => {
             console.log(err);
