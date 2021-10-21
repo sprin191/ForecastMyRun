@@ -1,6 +1,9 @@
 import React, {Component} from 'react';
 import {Container, Col, Row} from 'react-bootstrap';
 import moment from 'moment';
+import 'moment-timezone';
+import queryString from 'querystring';
+import fetch from "node-fetch";
 
 class Forecast extends Component {
     constructor(props) {
@@ -36,30 +39,72 @@ class Forecast extends Component {
     }
 
     getClimaCellInfo = (position) => {
-        let latitude = position.coords.latitude;
-        let longitude = position.coords.longitude;
+        const getTimelineURL = "https://api.tomorrow.io/v4/timelines";
+        const apikey = "xJD0RhzKbQOZlEWDhFrHXvYBZMt1Cqxh";
+        let location = position.coords.latitude + "," + position.coords.longitude;
+        const units = "imperial";
+        const timesteps = ["current", "1h", "1d"];
+        const startTime = moment().toISOString();
+        const endTime = moment().add(1, "days").toISOString();
+        const timezone = moment.tz.guess();
 
-        fetch("https://api.climacell.co/v3/weather/forecast/hourly?lat=" + latitude + "&lon=" + longitude + 
-        "&unit_system=us&start_time=now" + 
-        "&fields=temp%2Cfeels_like%2Chumidity%2Cdewpoint%2Cbaro_pressure%2Cwind_speed%2Cprecipitation_type%2Cprecipitation_probability%2Cweather_code%2Cepa_health_concern%2Chail_binary%2Csunrise%2Csunset%2Cmoon_phase&apikey=8HqeuIlQTHf95chEFsP52mdK6xMUFnVa", {
-            "method": "GET"
-        })
-        .then(response => response.json())
-        .then(
-            (result) => {
-                for (let i = 0; i < result.length; i++) {
-                    result[i].observation_date = moment(result[i].observation_time.value).format("dddd, MMMM Do YYYY");
-                    result[i].observation_time = moment(result[i].observation_time.value).format("hA");
+        const fields = [
+            "precipitationIntensity",
+            "precipitationType",
+            "precipitationProbability",
+            "windSpeed",
+            "windGust",
+            "temperature",
+            "temperatureApparent",
+            "dewPoint",
+            "humidity",
+            "weatherCode",
+            "sunriseTime",
+            "sunsetTime",
+            "moonPhase",
+            "uvIndex",
+            "uvHealthConcern",
+            "epaIndex",
+            "epaPrimaryPollutant",
+            "epaHealthConcern"
+          ];
+
+
+          const getTimelineParameters =  queryString.stringify({
+            apikey,
+            location,
+            fields,
+            units,
+            timesteps,
+            startTime,
+            endTime,
+            timezone,
+        });        
+
+        fetch(getTimelineURL + "?" + getTimelineParameters, {method: "GET"})
+        .then((result) => result.json())
+        .then((result) => {
+            result = result.data.timelines;
+            var formattedResult = [];
+
+            for (let i = 0; i < result.length; i++) {
+                if (result[i].timestep === "1h") {
+                    formattedResult = result[i].intervals;
+                    break;
                 };
-                result = result.filter(x => x.observation_date === this.state.currentDate);
-                this.setState({
-                    forecastData: result
-                });
-                console.log(result);
-        })
-        .catch(err => {
-            console.log(err);
-        });
+            };
+
+            for (let i = 0; i < formattedResult.length; i++) {
+                formattedResult[i].observation_date = moment(formattedResult[i].startTime).format("dddd, MMMM Do YYYY");
+                formattedResult[i].observation_time = moment(formattedResult[i].startTime).format("hA"); 
+            }
+
+            console.log(formattedResult);
+            this.setState({
+                forecastData: formattedResult
+            });
+    })
+        .catch((error) => console.error("error: " + error));
     }
 
     render() {
@@ -71,26 +116,12 @@ class Forecast extends Component {
                   <Col key={index} xs={6} sm={4} lg={3} className="forecast-item-container">
                         <div className="forecast-item">
                         <p>{data.observation_time}</p>
-                        <p>Temperature: {Math.round(data.temp.value)}°{data.temp.units}</p>
-                        {Math.round(data.feels_like.value) !== Math.round(data.temp.value) &&
-                            <p>Feels Like: {Math.round(data.feels_like.value)}°{data.feels_like.units}</p>
+                        <p>Temperature: {Math.round(data.values.temperature)}°F</p>
+                        {Math.round(data.values.temperatureApparent) !== Math.round(data.values.temperature) &&
+                            <p>Feels Like: {Math.round(data.values.temperatureApparent)}°F</p>
                         }
-                        <p>Humidity: {Math.round(data.humidity.value)}{data.humidity.units}</p>
-                        <p>Dewpoint: {Math.round(data.dewpoint.value)}°{data.dewpoint.units}</p>
-                        <p>{data.weather_code.value}</p>
-                        <p>Wind Speed: {Math.round(data.wind_speed.value)}{data.wind_speed.units}</p>
-                        {Math.round(data.baro_pressure.value) !== 30 &&
-                            <p>Barometric Pressure: {Math.round(data.baro_pressure.value)}{data.baro_pressure.units}</p>
-                        }
-                        {data.precipitation_probability.value > 0 && data.precipitation_type.value !== 'none' &&
-                            <p>Precipitation: {data.precipitation_probability.value}{data.precipitation_probability.units} {data.precipitation_type.value}</p>
-                        }
-                        {data.hail_binary === 1 &&
-                            <p>Hail Possible</p>
-                        }
-                        {data.epa_health_concern.value !== 'Good' && data.epa_health_concern.value !== 'Moderate' &&
-                            <p>EPA Health Concern: {data.epa_health_concern.value}</p>
-                        }
+                        <p>Humidity: {Math.round(data.values.humidity)}%</p>
+                        <p>Dewpoint: {Math.round(data.values.dewPoint)}°F</p>
                     </div>
                   </Col>
                 ))}
