@@ -100,6 +100,9 @@ class Forecast extends Component {
             }
 
             console.log(formattedResult);
+
+            formattedResult = formattedResult.filter(x => x.observation_date === this.state.currentDate);
+
             this.setState({
                 forecastData: formattedResult
             });
